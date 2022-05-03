@@ -1,60 +1,50 @@
+mod types;
+mod util;
+
 use similar::ChangeTag;
 use console::Style;
+use clap::Parser;
 use web3::types::Address;
-use regex::Regex;
-
-use std::env;
-
-/// Print usage text
-fn print_program_usage() {
-    eprintln!("Usage: {} <contract-address-1> <contract-address-2>", env!("CARGO_PKG_NAME", "bsccontract-diff"));
-}
-
-/// Check whether specified address string is an address.
-///
-/// This is not full-fledge checking in which it doesn't take into account
-/// checking of checksum address.
-///
-/// # Arguments
-/// * `address` - address string to check
-fn is_address_simplified(address: &str) -> bool {
-    let lowercase_address = address.to_lowercase();
-    let regex: Regex = Regex::new(r#"^(0x)?[0-9a-f]{40}$"#).unwrap();
-
-    regex.is_match(&lowercase_address)
-}
+use types::*;
+use util::*;
 
 #[tokio::main]
 async fn main() {
-    let args: Vec<String> = env::args().collect();
-
-    // check cli's arguments first
-    // might need a better check, but for now it's sufficed.
-    // Ignore arguments after required 2 addresses.
-    if args.len() < 3 {
-        print_program_usage();
-        std::process::exit(1);
-    }
+    // required argument of first, and second one will be automatically handled
+    // by clap as we set them as positional argument index.
+	let cmd_args = CommandlineArgs::parse();
 
     // pre-check of address arguments
-    if !is_address_simplified(&args[1]) {
+    if !is_address_simplified(&cmd_args.address1) {
         eprintln!("Error: 1st address is malformed. Make sure to prefix with '0x' and has 40 characters in length (exclude `0x`).");
         std::process::exit(1);
     }
-    if !is_address_simplified(&args[2]) {
+    if !is_address_simplified(&cmd_args.address2) {
         eprintln!("Error: 2nd address is malformed. Make sure to prefix with '0x' and has 40 characters in length (exclude `0x`).");
         std::process::exit(1);
     }
 
-    // create web3 related context
-	let http = match web3::transports::Http::new("https://bsc-dataseed.binance.org/") {
-        Ok(res) => res,
-        Err(e) => {
-            eprintln!("Error: creating web3's http; err={}", e);
-            std::process::exit(1);
-        }
-    };
-    let web3 = web3::Web3::new(http);
+    // validate value of chain flag option
+    let chain_value = cmd_args.chain.to_lowercase();
+    let mut chain: Option<ChainType> = None;
+    if chain_value == "bsc" {
+        chain = Some(ChainType::BSC);
+    }
+    else if chain_value == "ethereum" {
+        chain = Some(ChainType::Ethereum);
+    }
+    else if chain_value == "polygon" {
+        chain = Some(ChainType::Polygon);
+    }
+    // NOTE: no need for else case here as clap crate handles non-valid values
+    // for us.
+
+    if chain.is_none() {
+        eprintln!("Error unexpected thing happen affecting us not to determine which chain to operate on");
+        std::process::exit(1);
+    }
+
+    let web3 = create_web3(chain.unwrap());
     
     // CAVEAT: we cannot do early check whether the input address is indeed
     // a contract address, but until we get response of bytecode of back.
@@ -63,7 +53,7 @@ async fn main() {
     // If it is EOA address -> empty (0-length string)
 
     // get bytecode from specified contract address of both arguments
-    let contract1_hexbytes_decoded = match hex::decode(&args[1][2..]) {
+    let contract1_hexbytes_decoded = match hex::decode(&cmd_args.address1[2..]) {
         Ok(res) => res,
         Err(e) => {
             eprintln!("Error: hex decoding of 1st address; err={}", e);
@@ -73,7 +63,7 @@ async fn main() {
     let contract1_code_fut = web3.eth().code(Address::from_slice(contract1_hexbytes_decoded.as_slice()), None);
 
     // do the same for 2nd contract address
-    let contract2_hexbytes_decoded = match hex::decode(&args[2][2..]) {
+    let contract2_hexbytes_decoded = match hex::decode(&cmd_args.address2[2..]) {
         Ok(res) => res,
         Err(e) => {
             eprintln!("Error: hex decoding of 2nd address; err={}", e);

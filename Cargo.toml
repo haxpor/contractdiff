@@ -1,12 +1,12 @@
 [package]
-name = "bsccontract-diff"
-version = "0.1.0"
+name = "contractdiff"
+version = "1.0.0"
 edition = "2021"
 authors = ["Wasin Thonkaew <wasin@wasin.io>"]
 description = "Commandline program to output color-diff of contract code between two contract addresses. Suitable to use against non-verified contract code for analysis."
-repository = "https://github.com/haxpor/bsccontract-diff"
+repository = "https://github.com/haxpor/contractdiff"
 license = "MIT"
-keywords = ["bsc", "contract-address", "diff", "crypto", "blockchain"]
+keywords = ["contract", "contract-address", "diff", "crypto", "blockchain"]
 categories = ["command-line-utilities"]
 readme = "README.md"
 
@@ -20,3 +20,4 @@ hex = "0.4.3"
 futures = "0.3.21"
 tokio = { version = "1.17.0", features = ["full"] }
 regex = "1.5.5"
+clap = { version = "3.1.15", features = ["derive"] }
